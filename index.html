@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1F6FD1">
+<title>JANバーコード表示</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{
+  --blue:#1F6FD1; --blue-d:#1857A6; --ink:#1C2128; --sub:#5A6470; --line:#DDE2E8;
+  --bg:#F2F4F7; --paper:#FFFFFF; --flag:#F2C200; --flagbg:#FFF6CC;
+  --font:"BIZ UDPGothic","Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible{outline:3px solid var(--flag);outline-offset:2px}
+
+/* ===== 一覧 ===== */
+#listView{min-height:100%;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:5;background:var(--blue);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 14px 12px}
+.top h1{margin:0 0 8px;font-size:17px;font-weight:700;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.top h1 small{font-size:12px;font-weight:400;opacity:.85}
+.sbox{position:relative}
+#q{width:100%;font:inherit;font-size:19px;border:0;border-radius:10px;padding:13px 44px 13px 14px;background:#fff;color:var(--ink)}
+#q::placeholder{color:#8A939E}
+#qClear{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:none;font-size:22px;color:#8A939E;display:none}
+.cnt{font-size:13px;color:var(--sub);padding:8px 16px 4px}
+#list{list-style:none;margin:0;padding:0 0 calc(24px + env(safe-area-inset-bottom))}
+.it{display:block;width:100%;text-align:left;background:var(--paper);border:0;border-bottom:1px solid var(--line);padding:14px 16px;min-height:64px}
+.it:active{background:#E6F0FC}
+.it .n{font-weight:700;font-size:17px;line-height:1.35}
+.it .m{font-size:13.5px;color:var(--sub);margin-top:3px;font-variant-numeric:tabular-nums}
+.flag{display:inline-block;background:var(--flag);color:#1C2128;font-size:12px;font-weight:700;border-radius:4px;padding:0 6px;margin-left:6px;vertical-align:2px}
+.sec{font-size:13px;color:var(--sub);padding:12px 16px 6px;background:var(--bg)}
+.empty{padding:28px 18px;color:var(--sub);line-height:1.7}
+
+/* ===== バーコード画面 ===== */
+#codeView{position:fixed;inset:0;background:var(--paper);display:none;flex-direction:column;z-index:10}
+#codeView.on{display:flex}
+.cv-top{display:flex;align-items:center;gap:8px;padding:calc(8px + env(safe-area-inset-top)) 8px 8px;border-bottom:6px solid var(--blue)}
+.back{border:0;background:var(--bg);border-radius:10px;padding:12px 16px;font-size:17px;font-weight:700;min-width:96px}
+.cv-top .ttl{font-size:13px;color:var(--sub);margin-left:auto;padding-right:8px;text-align:right}
+.cv-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 0;overflow:auto}
+.cv-name{font-size:22px;font-weight:700;line-height:1.35;text-align:center;padding:0 18px}
+.cv-code{font-size:15px;color:var(--sub);margin-top:4px;text-align:center}
+.cv-flag{margin:12px 16px 0;background:var(--flagbg);border-left:6px solid var(--flag);padding:10px 12px;font-size:14px;line-height:1.55}
+.bcwrap{margin-top:22px;background:#fff;display:flex;justify-content:center}
+#bc{display:block}
+.cv-num{font:600 22px/1 Roboto,"Helvetica Neue",Arial,sans-serif;letter-spacing:.14em;margin-top:10px;font-variant-numeric:tabular-nums}
+.cv-foot{padding:10px 16px calc(14px + env(safe-area-inset-bottom));display:flex;gap:10px}
+.nav{flex:1;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:14px 8px;font-size:16px;font-weight:700}
+.nav:disabled{opacity:.35}
+.tip{font-size:12.5px;color:var(--sub);text-align:center;padding:0 16px 6px}
+</style>
+</head>
+<body>
+
+<div id="listView">
+  <header class="top">
+    <h1>JANバーコード表示 <small id="meta"></small></h1>
+    <div class="sbox">
+      <input id="q" type="search" inputmode="search" enterkeyhint="search" placeholder="商品名・商品コード・JANで検索" autocomplete="off" aria-label="商品をさがす">
+      <button id="qClear" aria-label="検索を消す">×</button>
+    </div>
+  </header>
+  <div class="cnt" id="cnt"></div>
+  <ul id="list" role="list"></ul>
+</div>
+
+<section id="codeView" aria-live="polite">
+  <div class="cv-top">
+    <button class="back" id="back">← 一覧</button>
+    <span class="ttl">スキャナーに<br>画面を向けてください</span>
+  </div>
+  <div class="cv-body">
+    <div class="cv-name" id="cvName"></div>
+    <div class="cv-code" id="cvCode"></div>
+    <div class="cv-flag" id="cvFlag" hidden></div>
+    <div class="bcwrap"><svg id="bc" shape-rendering="crispEdges" role="img"></svg></div>
+    <div class="cv-num" id="cvNum"></div>
+  </div>
+  <p class="tip">読めないときは、画面を明るくして、スキャナーから少し離してください。</p>
+  <div class="cv-foot">
+    <button class="nav" id="prev">◀ 前の商品</button>
+    <button class="nav" id="next">次の商品 ▶</button>
+  </div>
+</section>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let ITEMS=[], view=[], cur=-1;
+
+/* ---------- EAN-13 ---------- */
+const L=["0001101","0011001","0010011","0111101","0100011","0110001","0101111","0111011","0110111","0001011"];
+const G=["0100111","0110011","0011011","0100001","0011101","0111001","0000101","0010001","0001001","0010111"];
+const R=["1110010","1100110","1101100","1000010","1011100","1001110","1010000","1000100","1001000","1110100"];
+const PAR=["LLLLLL","LLGLGG","LLGGLG","LLGGGL","LGLLGG","LGGLLG","LGGGLL","LGLGLG","LGLGGL","LGGLGL"];
+function validJan(s){if(!/^\d{13}$/.test(s))return false;let t=0;for(let i=0;i<12;i++)t+=(+s[i])*(i%2?3:1);return (10-t%10)%10===+s[12]}
+function drawEAN(jan){
+  const d=jan.split("").map(Number), p=PAR[d[0]];
+  let bits="101"; for(let i=1;i<=6;i++) bits+=(p[i-1]==="L"?L:G)[d[i]];
+  bits+="01010"; for(let i=7;i<=12;i++) bits+=R[d[i]]; bits+="101";
+  const Q=11, total=bits.length+Q*2; // 95 + 左右の余白
+  // 画面のピクセルにぴったり合う太さにして、にじみを防ぐ
+  const dpr=window.devicePixelRatio||1;
+  const avail=Math.min(window.innerWidth,520)-16;
+  const modPx=Math.max(1,Math.floor(avail*dpr/total));
+  const wCss=modPx*total/dpr, hCss=Math.min(wCss*0.55,window.innerHeight*0.32);
+  let r=`<rect width="${total}" height="100" fill="#fff"/>`;
+  for(let i=0;i<bits.length;){
+    if(bits[i]!=="1"){i++;continue}
+    let j=i;while(j<bits.length&&bits[j]==="1")j++;
+    r+=`<rect x="${Q+i}" y="0" width="${j-i}" height="100" fill="#000"/>`;i=j;
+  }
+  const svg=$("bc");
+  svg.setAttribute("viewBox",`0 0 ${total} 100`);
+  svg.setAttribute("preserveAspectRatio","none");
+  svg.style.width=wCss+"px"; svg.style.height=hCss+"px";
+  svg.setAttribute("aria-label","JAN "+jan);
+  svg.innerHTML=r;
+}
+
+/* ---------- 検索 ---------- */
+function norm(s){return (s||"").normalize("NFKC").toLowerCase().replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60)).replace(/[\s　]+/g,"")}
+function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
+function recent(){try{return JSON.parse(ls("jan-recent")||"[]")}catch(e){return []}}
+function pushRecent(v){const r=recent().filter(x=>x!==v);r.unshift(v);ls("jan-recent",JSON.stringify(r.slice(0,8)))}
+function row(p,i){return `<li><button class="it" data-i="${i}"><div class="n">${esc(p.n)}${p.f?'<span class="flag">要確認</span>':""}</div><div class="m">${p.c?esc(p.c)+"　":""}${p.v}</div></button></li>`}
+function render(){
+  const raw=$("q").value; $("qClear").style.display=raw?"block":"none";
+  const ks=raw.split(/[\s　]+/).map(norm).filter(Boolean);
+  view=ITEMS.filter(p=>ks.every(k=>p.k.includes(k)));
+  let html="";
+  if(!ks.length){
+    const rc=recent().map(v=>ITEMS.find(p=>p.v===v)).filter(Boolean);
+    if(rc.length){
+      html+=`<li class="sec">最近ひらいた商品</li>`+rc.map(p=>row(p,view.indexOf(p))).join("")+`<li class="sec">すべての商品</li>`;
+    }
+  }
+  html+=view.map((p,i)=>row(p,i)).join("");
+  $("list").innerHTML=view.length?html:`<li class="empty">見つかりませんでした。<br>言葉を短くするか、商品コードやJANの一部で探してください（例：キウイ、006、0420）。</li>`;
+  $("cnt").textContent=ks.length?`${view.length}件 見つかりました`:`全${ITEMS.length}件`;
+}
+$("q").addEventListener("input",render);
+$("q").addEventListener("keydown",e=>{if(e.key==="Enter"){$("q").blur();if(view.length===1)open(0)}});
+$("qClear").onclick=()=>{$("q").value="";render();$("q").focus()};
+$("list").addEventListener("click",e=>{const b=e.target.closest(".it");if(b)open(+b.dataset.i)});
+
+/* ---------- バーコード画面 ---------- */
+let lock=null;
+async function keepAwake(on){
+  try{
+    if(on&&"wakeLock" in navigator&&!lock){lock=await navigator.wakeLock.request("screen");lock.addEventListener("release",()=>lock=null)}
+    if(!on&&lock){await lock.release();lock=null}
+  }catch(e){}
+}
+function show(){
+  const p=view[cur];
+  $("cvName").textContent=p.n;
+  $("cvCode").textContent=p.c?`商品コード ${p.c}`:"";
+  $("cvFlag").hidden=!p.f; $("cvFlag").innerHTML=p.f?`<b>要確認</b>　${esc(p.f)}`:"";
+  $("cvNum").textContent=p.v;
+  drawEAN(p.v);
+  $("prev").disabled=cur<=0; $("next").disabled=cur>=view.length-1;
+  pushRecent(p.v);
+}
+function open(i){
+  if(i<0||i>=view.length) return;
+  cur=i; show(); $("codeView").classList.add("on");
+  history.pushState({code:1},""); keepAwake(true);
+}
+function close(){ $("codeView").classList.remove("on"); keepAwake(false); render(); }
+$("back").onclick=()=>history.back();
+window.addEventListener("popstate",()=>{if($("codeView").classList.contains("on"))close()});
+$("prev").onclick=()=>{if(cur>0){cur--;show()}};
+$("next").onclick=()=>{if(cur<view.length-1){cur++;show()}};
+window.addEventListener("resize",()=>{if(cur>=0&&$("codeView").classList.contains("on"))drawEAN(view[cur].v)});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&$("codeView").classList.contains("on"))keepAwake(true)});
+
+/* ---------- 読み込み ---------- */
+async function load(){
+  try{
+    const r=await fetch("data.json",{cache:"no-store"}); const d=await r.json();
+    ITEMS=d.items.filter(p=>validJan(p.v));
+    ITEMS.forEach(p=>p.k=norm([p.c,p.n,p.v].join(" ")));
+    $("meta").textContent=`データ ${d.updated}`;
+    render();
+  }catch(e){
+    $("list").innerHTML=`<li class="empty">商品データを読み込めませんでした。<br>電波のある場所で、いちど開き直してください。</li>`;
+  }
+}
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+load();
+</script>
+</body>
+</html>
