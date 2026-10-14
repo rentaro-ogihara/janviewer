@@ -26,6 +26,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--flag);outline-o
 .top h1 small{font-size:12px;font-weight:400;opacity:.85}
 .sbox{position:relative}
 #q{width:100%;font:inherit;font-size:19px;border:0;border-radius:10px;padding:13px 44px 13px 14px;background:#fff;color:var(--ink)}
+#q::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
 #q::placeholder{color:#8A939E}
 #qClear{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:none;font-size:22px;color:#8A939E;display:none}
 .cnt{font-size:13px;color:var(--sub);padding:8px 16px 4px}
@@ -34,6 +35,8 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--flag);outline-o
 .it:active{background:#E6F0FC}
 .it .n{font-weight:700;font-size:17px;line-height:1.35}
 .it .m{font-size:13.5px;color:var(--sub);margin-top:3px;font-variant-numeric:tabular-nums}
+.ty{display:inline-block;font-size:11.5px;font-weight:700;border-radius:4px;padding:0 6px;margin-right:6px;vertical-align:1px;color:#fff;background:var(--blue)}
+.ty.fba{background:#C2410C}
 .flag{display:inline-block;background:var(--flag);color:#1C2128;font-size:12px;font-weight:700;border-radius:4px;padding:0 6px;margin-left:6px;vertical-align:2px}
 .sec{font-size:13px;color:var(--sub);padding:12px 16px 6px;background:var(--bg)}
 .empty{padding:28px 18px;color:var(--sub);line-height:1.7}
@@ -42,6 +45,8 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--flag);outline-o
 #codeView{position:fixed;inset:0;background:var(--paper);display:none;flex-direction:column;z-index:10}
 #codeView.on{display:flex}
 .cv-top{display:flex;align-items:center;gap:8px;padding:calc(8px + env(safe-area-inset-top)) 8px 8px;border-bottom:6px solid var(--blue)}
+#codeView.fba .cv-top{border-bottom-color:#C2410C}
+.cv-type{margin-bottom:10px}
 .back{border:0;background:var(--bg);border-radius:10px;padding:12px 16px;font-size:17px;font-weight:700;min-width:96px}
 .cv-top .ttl{font-size:13px;color:var(--sub);margin-left:auto;padding-right:8px;text-align:right}
 .cv-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 0;overflow:auto}
@@ -63,7 +68,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--flag);outline-o
   <header class="top">
     <h1>JANバーコード表示 <small id="meta"></small></h1>
     <div class="sbox">
-      <input id="q" type="search" inputmode="search" enterkeyhint="search" placeholder="商品名・商品コード・JANで検索" autocomplete="off" aria-label="商品をさがす">
+      <input id="q" type="search" inputmode="search" enterkeyhint="search" placeholder="商品名・商品コード・番号で検索" autocomplete="off" aria-label="商品をさがす">
       <button id="qClear" aria-label="検索を消す">×</button>
     </div>
   </header>
@@ -77,7 +82,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--flag);outline-o
     <span class="ttl">スキャナーに<br>画面を向けてください</span>
   </div>
   <div class="cv-body">
-    <div class="cv-name" id="cvName"></div>
+    <div class="cv-type" id="cvType"></div><div class="cv-name" id="cvName"></div>
     <div class="cv-code" id="cvCode"></div>
     <div class="cv-flag" id="cvFlag" hidden></div>
     <div class="bcwrap"><svg id="bc" shape-rendering="crispEdges" role="img"></svg></div>
@@ -125,12 +130,31 @@ function drawEAN(jan){
   svg.innerHTML=r;
 }
 
+/* ---------- Code128（Amazon用 FNSKU） ---------- */
+const C128=["212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312", "132212", "221213", "221312", "231212", "112232", "122132", "122231", "113222", "123122", "123221", "223211", "221132", "221231", "213212", "223112", "312131", "311222", "321122", "321221", "312212", "322112", "322211", "212123", "212321", "232121", "111323", "131123", "131321", "112313", "132113", "132311", "211313", "231113", "231311", "112133", "112331", "132131", "113123", "113321", "133121", "313121", "211331", "231131", "213113", "213311", "213131", "311123", "311321", "331121", "312113", "312311", "332111", "314111", "221411", "431111", "111224", "111422", "121124", "121421", "141122", "141221", "112214", "112412", "122114", "122411", "142112", "142211", "241211", "221114", "413111", "241112", "134111", "111242", "121142", "121241", "114212", "124112", "124211", "411212", "421112", "421211", "212141", "214121", "412121", "111143", "111341", "131141", "114113", "114311", "411113", "411311", "113141", "114131", "311141", "411131", "211412", "211214", "211232", "2331112"];
+function validFn(s){return /^(X0|B0)[0-9A-Z]{8}$/.test(s)}
+function drawC128(v){
+  const codes=[104]; for(const ch of v) codes.push(ch.charCodeAt(0)-32);
+  let sum=104; for(let i=1;i<codes.length;i++) sum+=codes[i]*i; codes.push(sum%103); codes.push(106);
+  const Q=10; let x=Q, r="";
+  codes.forEach(c=>{const w=C128[c];for(let i=0;i<w.length;i++){const n=+w[i];if(i%2===0)r+=`<rect x="${x}" y="0" width="${n}" height="100" fill="#000"/>`;x+=n}});
+  const total=x+Q;
+  const dpr=window.devicePixelRatio||1, avail=Math.min(window.innerWidth,520)-16;
+  const modPx=Math.max(1,Math.floor(avail*dpr/total));
+  const wCss=modPx*total/dpr, hCss=Math.min(wCss*0.42,window.innerHeight*0.28);
+  const svg=$("bc"); svg.setAttribute("viewBox",`0 0 ${total} 100`); svg.setAttribute("preserveAspectRatio","none");
+  svg.style.width=wCss+"px"; svg.style.height=hCss+"px"; svg.setAttribute("aria-label","FNSKU "+v);
+  svg.innerHTML=`<rect width="${total}" height="100" fill="#fff"/>`+r;
+}
+
 /* ---------- 検索 ---------- */
 function norm(s){return (s||"").normalize("NFKC").toLowerCase().replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60)).replace(/[\s　]+/g,"")}
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
 function recent(){try{return JSON.parse(ls("jan-recent")||"[]")}catch(e){return []}}
 function pushRecent(v){const r=recent().filter(x=>x!==v);r.unshift(v);ls("jan-recent",JSON.stringify(r.slice(0,8)))}
-function row(p,i){return `<li><button class="it" data-i="${i}"><div class="n">${esc(p.n)}${p.f?'<span class="flag">要確認</span>':""}</div><div class="m">${p.c?esc(p.c)+"　":""}${p.v}</div></button></li>`}
+const TYPE={jan:"JAN",fba:"Amazon"};
+function badge(p){return `<span class="ty ${p.t}">${TYPE[p.t]}</span>`}
+function row(p,i){return `<li><button class="it" data-i="${i}"><div class="n">${badge(p)}${esc(p.n)}${p.f?'<span class="flag">要確認</span>':""}</div><div class="m">${p.c?esc(p.c)+"　":""}${p.v}</div></button></li>`}
 function render(){
   const raw=$("q").value; $("qClear").style.display=raw?"block":"none";
   const ks=raw.split(/[\s　]+/).map(norm).filter(Boolean);
@@ -143,7 +167,7 @@ function render(){
     }
   }
   html+=view.map((p,i)=>row(p,i)).join("");
-  $("list").innerHTML=view.length?html:`<li class="empty">見つかりませんでした。<br>言葉を短くするか、商品コードやJANの一部で探してください（例：キウイ、006、0420）。</li>`;
+  $("list").innerHTML=view.length?html:`<li class="empty">見つかりませんでした。<br>言葉を短くするか、商品コードやJANの一部で探してください（例：キウイ、006、0420、amazon）。</li>`;
   $("cnt").textContent=ks.length?`${view.length}件 見つかりました`:`全${ITEMS.length}件`;
 }
 $("q").addEventListener("input",render);
@@ -165,7 +189,9 @@ function show(){
   $("cvCode").textContent=p.c?`商品コード ${p.c}`:"";
   $("cvFlag").hidden=!p.f; $("cvFlag").innerHTML=p.f?`<b>要確認</b>　${esc(p.f)}`:"";
   $("cvNum").textContent=p.v;
-  drawEAN(p.v);
+  $("cvType").innerHTML=p.t==="fba"?'<span class="ty fba">Amazon用（FNSKU）</span>':'<span class="ty">JANコード</span>';
+  $("codeView").classList.toggle("fba",p.t==="fba");
+  if(p.t==="fba") drawC128(p.v); else drawEAN(p.v);
   $("prev").disabled=cur<=0; $("next").disabled=cur>=view.length-1;
   pushRecent(p.v);
 }
@@ -179,15 +205,15 @@ $("back").onclick=()=>history.back();
 window.addEventListener("popstate",()=>{if($("codeView").classList.contains("on"))close()});
 $("prev").onclick=()=>{if(cur>0){cur--;show()}};
 $("next").onclick=()=>{if(cur<view.length-1){cur++;show()}};
-window.addEventListener("resize",()=>{if(cur>=0&&$("codeView").classList.contains("on"))drawEAN(view[cur].v)});
+window.addEventListener("resize",()=>{if(cur>=0&&$("codeView").classList.contains("on")){const p=view[cur];p.t==="fba"?drawC128(p.v):drawEAN(p.v)}});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&$("codeView").classList.contains("on"))keepAwake(true)});
 
 /* ---------- 読み込み ---------- */
 async function load(){
   try{
     const r=await fetch("data.json",{cache:"no-store"}); const d=await r.json();
-    ITEMS=d.items.filter(p=>validJan(p.v));
-    ITEMS.forEach(p=>p.k=norm([p.c,p.n,p.v].join(" ")));
+    ITEMS=d.items.map(p=>({...p,t:p.t||"jan"})).filter(p=>p.t==="fba"?validFn(p.v):validJan(p.v));
+    ITEMS.forEach(p=>p.k=norm([p.c,p.n,p.v,p.t==="fba"?"amazon fnsku アマゾン":"jan"].join(" ")));
     $("meta").textContent=`データ ${d.updated}`;
     render();
   }catch(e){
