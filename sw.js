@@ -1,5 +1,5 @@
 // 画面などはキャッシュを優先、商品データ（data.json）は通信できればいつも最新を取りにいく
-const CACHE = "jan-viewer-v3";
+const CACHE = "jan-viewer-v4";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./data.json"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
